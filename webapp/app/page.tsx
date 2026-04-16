@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -137,7 +138,13 @@ export default function Home() {
                   {msg.role === "user" ? "나" : "AI"}
                 </span>
                 <div className="message-bubble">
-                  {msg.content || (
+                  {msg.content ? (
+                    msg.role === "assistant" ? (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    ) : (
+                      msg.content
+                    )
+                  ) : (
                     <div className="typing-indicator">
                       <span />
                       <span />

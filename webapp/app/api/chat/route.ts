@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       contents,
       config: {
         systemInstruction: systemPrompt,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
         temperature: 0.7,
         thinkingConfig: { thinkingBudget: 0 },
       },
@@ -70,7 +70,10 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            const text = chunk.text;
+            const text =
+              chunk.text ??
+              chunk.candidates?.[0]?.content?.parts?.[0]?.text ??
+              "";
             if (text) {
               controller.enqueue(encoder.encode(text));
             }
