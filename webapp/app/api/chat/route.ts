@@ -8,7 +8,12 @@ export const runtime = "nodejs";
 function getKnowledgeBase(): string {
   try {
     const filePath = path.join(process.cwd(), "data", "knowledge_base.md");
-    return fs.readFileSync(filePath, "utf-8");
+    const content = fs.readFileSync(filePath, "utf-8");
+    // Groq 무료 티어 TPM 한도(12,000) 초과 방지: 약 6,000토큰 = 24,000자로 제한
+    const MAX_CHARS = 24000;
+    return content.length > MAX_CHARS
+      ? content.slice(0, MAX_CHARS) + "\n\n[지식베이스 일부 생략 - 토큰 한도]"
+      : content;
   } catch {
     return "";
   }
@@ -57,7 +62,7 @@ export async function POST(req: NextRequest) {
         ...messages,
       ],
       stream: true,
-      max_tokens: 2048,
+      max_tokens: 1024,
       temperature: 0.7,
     });
 
