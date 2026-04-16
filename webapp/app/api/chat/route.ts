@@ -5,10 +5,6 @@ import path from "path";
 
 export const runtime = "nodejs";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 function getKnowledgeBase(): string {
   try {
     const filePath = path.join(process.cwd(), "data", "knowledge_base.md");
@@ -38,6 +34,16 @@ const SYSTEM_PROMPT_INTRO = `당신은 주언규 PD의 24주차 비즈니스/유
 `;
 
 export async function POST(req: NextRequest) {
+  if (!process.env.GROQ_API_KEY) {
+    console.error("GROQ_API_KEY is not set");
+    return new Response(
+      JSON.stringify({ error: "GROQ_API_KEY 환경변수가 설정되지 않았습니다." }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
   try {
     const { messages } = await req.json();
 
@@ -66,8 +72,10 @@ export async function POST(req: NextRequest) {
               controller.enqueue(encoder.encode(text));
             }
           }
-        } finally {
           controller.close();
+        } catch (streamError) {
+          console.error("Stream error:", streamError);
+          controller.error(streamError);
         }
       },
     });
@@ -81,10 +89,12 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Chat API error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    const status = (error as { status?: number }).status ?? 500;
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: message }),
       {
-        status: 500,
+        status,
         headers: { "Content-Type": "application/json" },
       }
     );

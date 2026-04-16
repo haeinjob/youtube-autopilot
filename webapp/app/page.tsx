@@ -50,7 +50,10 @@ export default function Home() {
         body: JSON.stringify({ messages: newMessages }),
       });
 
-      if (!response.ok) throw new Error("API error");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(errData.error || `HTTP ${response.status}`);
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -77,12 +80,13 @@ export default function Home() {
           });
         }
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "알 수 없는 오류";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "오류가 발생했습니다. 다시 시도해주세요.",
+          content: `오류: ${errMsg}`,
         },
       ]);
     } finally {
