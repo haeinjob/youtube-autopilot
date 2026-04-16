@@ -9,8 +9,8 @@ function getKnowledgeBase(): string {
   try {
     const filePath = path.join(process.cwd(), "data", "knowledge_base.md");
     const content = fs.readFileSync(filePath, "utf-8");
-    // Groq 무료 티어 TPM 한도(12,000) 초과 방지: 약 6,000토큰 = 24,000자로 제한
-    const MAX_CHARS = 24000;
+    // llama-3.1-8b-instant 무료 티어 TPM 한도(20,000) 안전 범위: 약 13,000자
+    const MAX_CHARS = 13000;
     return content.length > MAX_CHARS
       ? content.slice(0, MAX_CHARS) + "\n\n[지식베이스 일부 생략 - 토큰 한도]"
       : content;
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = SYSTEM_PROMPT_INTRO + knowledgeBase + "\n=================";
 
     const stream = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "llama-3.1-8b-instant",
       messages: [
         { role: "system", content: systemPrompt },
         ...messages,
