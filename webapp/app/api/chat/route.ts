@@ -1,23 +1,8 @@
 import { NextRequest } from "next/server";
 import Groq from "groq-sdk";
-import fs from "fs";
-import path from "path";
+import { retrieveRelevantContext } from "../../../lib/rag";
 
 export const runtime = "nodejs";
-
-function getKnowledgeBase(): string {
-  try {
-    const filePath = path.join(process.cwd(), "data", "knowledge_base.md");
-    const content = fs.readFileSync(filePath, "utf-8");
-    // llama-3.1-8b-instant 무료 티어 TPM 한도(20,000) 안전 범위: 약 13,000자
-    const MAX_CHARS = 13000;
-    return content.length > MAX_CHARS
-      ? content.slice(0, MAX_CHARS) + "\n\n[지식베이스 일부 생략 - 토큰 한도]"
-      : content;
-  } catch {
-    return "";
-  }
-}
 
 const SYSTEM_PROMPT_INTRO = `당신은 주언규 PD의 24주차 비즈니스/유튜브 수익화 강의를 완전히 학습한 AI 어시스턴트입니다.
 
@@ -52,7 +37,9 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
-    const knowledgeBase = getKnowledgeBase();
+    // 마지막 사용자 메시지를 쿼리로 사용해 관련 섹션만 검색
+    const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === "user")?.content ?? "";
+    const knowledgeBase = retrieveRelevantContext(lastUserMsg, 10000);
     const systemPrompt = SYSTEM_PROMPT_INTRO + knowledgeBase + "\n=================";
 
     const stream = await groq.chat.completions.create({
