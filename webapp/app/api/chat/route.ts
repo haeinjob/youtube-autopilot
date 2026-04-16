@@ -1,8 +1,20 @@
 import { NextRequest } from "next/server";
-import Groq from "groq-sdk";
-import { retrieveRelevantContext } from "../../../lib/rag";
+import { GoogleGenAI } from "@google/genai";
+import fs from "fs";
+import path from "path";
 
 export const runtime = "nodejs";
+
+function getKnowledgeBase(): string {
+  try {
+    return fs.readFileSync(
+      path.join(process.cwd(), "data", "knowledge_base.md"),
+      "utf-8"
+    );
+  } catch {
+    return "";
+  }
+}
 
 const SYSTEM_PROMPT_INTRO = `당신은 주언규 PD의 24주차 비즈니스/유튜브 수익화 강의를 완전히 학습한 AI 어시스턴트입니다.
 
@@ -24,33 +36,35 @@ const SYSTEM_PROMPT_INTRO = `당신은 주언규 PD의 24주차 비즈니스/유
 `;
 
 export async function POST(req: NextRequest) {
-  if (!process.env.GROQ_API_KEY) {
-    console.error("GROQ_API_KEY is not set");
+  if (!process.env.GEMINI_API_KEY) {
     return new Response(
-      JSON.stringify({ error: "GROQ_API_KEY 환경변수가 설정되지 않았습니다." }),
+      JSON.stringify({ error: "GEMINI_API_KEY 환경변수가 설정되지 않았습니다." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   try {
     const { messages } = await req.json();
 
-    // 마지막 사용자 메시지를 쿼리로 사용해 관련 섹션만 검색
-    const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === "user")?.content ?? "";
-    const knowledgeBase = retrieveRelevantContext(lastUserMsg, 10000);
+    const knowledgeBase = getKnowledgeBase();
     const systemPrompt = SYSTEM_PROMPT_INTRO + knowledgeBase + "\n=================";
 
-    const stream = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages,
-      ],
-      stream: true,
-      max_tokens: 1024,
-      temperature: 0.7,
+    // Gemini 형식으로 메시지 변환 (assistant → model)
+    const contents = messages.map((m: { role: string; content: string }) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+    const stream = await ai.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents,
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 2048,
+        temperature: 0.7,
+      },
     });
 
     const encoder = new TextEncoder();
@@ -59,7 +73,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            const text = chunk.choices[0]?.delta?.content || "";
+            const text = chunk.text;
             if (text) {
               controller.enqueue(encoder.encode(text));
             }
