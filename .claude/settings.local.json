@@ -4,7 +4,8 @@
       "Bash(gh --version)",
       "Bash(git --version)",
       "Bash(git config:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:outlierkit.com)"
     ]
   }
 }
